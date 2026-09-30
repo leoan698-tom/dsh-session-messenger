@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import React from 'react';
+import * as jsxRuntime from 'react/jsx-runtime';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {Context} from '@deepseek-ai/cordis';
+import * as cordis from '@deepseek-ai/cordis';
+import * as reactDomClient from 'react-dom/client';
+import * as reactDom from 'react-dom';
+import * as slotContracts from '@deepseek-ai/dsh-client-ui-slots';
+import {remoteContribution} from '../dist/contract.js';
+test('actual DSH browser factory format and official bundle config slot register and dispose',async()=>{
+  let bundle;
+  vm.runInNewContext(await readFile(new URL('../dist/client.js',import.meta.url),'utf8'),{window:{__ModuleLoader__:{load:value=>{bundle=value;}}},console,globalThis,TextEncoder,TextDecoder});
+  assert.equal(bundle.id,'dsh-session-messenger');
+  const client=bundle.factory(name=>{if(name==='react')return React;if(name==='react/jsx-runtime')return jsxRuntime;throw new Error(`Unexpected runtime external ${name}`);});
+  let rendererBundle;
+  vm.runInNewContext(await readFile(new URL(import.meta.resolve('@deepseek-ai/dsh-client-ui-renderer/client')),'utf8'), {window:{__ModuleLoader__:{load:value=>{rendererBundle=value;}}},console,globalThis});
+  const renderer=rendererBundle.factory(name=>{if(name==='react')return React;if(name==='react/jsx-runtime')return jsxRuntime;if(name==='react-dom')return reactDom;if(name==='react-dom/client')return reactDomClient;if(name==='@deepseek-ai/dsh-client-ui-slots')return slotContracts;if(name==='@deepseek-ai/cordis')return cordis;throw new Error(`Unexpected renderer external ${name}`);});
+  const ctx=new Context();const slots=new renderer.SlotRegistry(ctx);let mounted;
+  slots.register({name:'root',children:{'plugins.bundle.config':{kind:'keyed',scope:'root'}}},()=>null);
+  // Host RPC covered by real Gateway tests; this test isolates browser registration and rendering.
+  ctx.provide('remote',{$mount:async value=>{mounted=value;return async()=>{};},sessionMessenger:{}});
+  await ctx.plugin(client);
+  assert.deepEqual(Array.from(mounted.descriptors,d=>d.method),remoteContribution.descriptors.map(d=>d.method));
+  const entries=slots.entries('plugins.bundle.config');assert.equal(entries.length,1);
+  const html=renderToStaticMarkup(React.createElement(entries[0].component,{api:{},view:'page'}));assert.match(html,/跨会话信使/);assert.match(html,/拒收/);assert.match(html,/DELETE MESSENGER DATA/);
+  await ctx.fiber.dispose();assert.equal(slots.entries('plugins.bundle.config').length,0);
+});
