@@ -4,7 +4,7 @@
 
 ## 本地结果
 
-`npm run check`：lint、strict TypeScript、7 项核心单元测试、1 项客户端模块/渲染测试、6 项真实 Host 集成测试通过，共 14 项。`npm pack --dry-run` 验证了分发文件清单，不包含源测试数据、node_modules、profile 或凭据。`npm audit` 安装检查报告 0 vulnerabilities。
+`npm run check`：lint、strict TypeScript、10 项核心单元测试、1 项客户端模块/渲染测试、7 项真实 Host 集成测试通过，共 18 项。`npm pack --dry-run` 验证了分发文件清单，不包含源测试数据、node_modules、profile 或凭据。`npm audit` 安装检查报告 0 vulnerabilities。
 
 | 验证 | 测试层级 | 证据 |
 |---|---|---|
@@ -43,3 +43,7 @@ npm pack --dry-run
 ```
 
 GitHub Actions 的 CI 工作流对 Linux 与 Windows、Node 24 执行同一命令，具体运行结果和 commit SHA 以仓库 Actions 页面为准。本报告不把本地通过等同于远端 CI 通过。
+
+## Review 回归
+
+补充验证双方跨 workspace 许可（只允许接收方或只允许发送方均失败）；release 在会话关闭后保持 processed/uncertain 等所有非 queued 历史回执；模型目录只发现主动开放且允许当前发送方的目标，默认拒收、无白名单许可和双侧跨 workspace 未授权的 ID/状态/别名不泄漏。操作员 UI 仍可查看全部当前活动 root。3 项单元回归与 1 项真实 Host 回归纳入完整检查，真实 processed 会话关闭回归也已加入已有集成测试。

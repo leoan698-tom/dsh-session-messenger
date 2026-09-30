@@ -14,7 +14,7 @@ DSH 必须为 `0.2.0-rc.2`，Node.js 24。manifest 声明兼容版本，但宿�
 
 ## 配置
 
-接收许可在 UI 中按 session ID 设置。无策略为 refuse，空白名单无人可发送。别名最多 80 字符；允许发送方最多 64 个。hold 也要求白名单和跨 workspace 许可。目标设置 accept 不会自动发送既存队列。
+接收许可在 UI 中按 session ID 设置。无策略为 refuse，空白名单无人可发送。别名最多 80 字符；允许发送方最多 64 个。hold 也要求白名单和跨 workspace 双方许可。目标设置 accept 不会自动发送既存队列。
 
 Host row 的 config 可降低预算，例如 profile 的 patch 中：
 
@@ -57,3 +57,5 @@ Host row 的 config 可降低预算，例如 profile 的 patch 中：
 - WAKE_BUDGET：等待 60 秒预算窗口后由用户显式 release；不会后台唤醒。
 - uncertain：检查真实目标会话后自行决定是否以新 ID 发新消息，不能当作安全重试。
 - RECORD_LIMIT_EXPORT_AND_CLEAR：导出后明确清理，或暂停通信。不要自动删除幂等记录以绕过上限。
+
+跨 workspace 开关同时授权本会话向外发送和从允许发送方接收；发送与接收两侧都需明确开启。模型目录不显示 refuse、白名单未授权或双方跨 workspace 未许可的目标，操作员设置页仍显示全部活动 root。

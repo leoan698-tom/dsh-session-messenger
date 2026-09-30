@@ -19,6 +19,7 @@ test('actual isolated Host registers plugin, strict settings RPC and two indepen
   const duplicate=value(await h.tool(a.agent,'session_message_send',{id:'host-one',target:b.agent.id,text:'Synthetic hello'}));assert.ok(['delivered','claimed'].includes(duplicate.status));assert.equal(h.adapter.calls.length,1);
   const fake=value(await h.tool(a.agent,'session_message_send',{target:b.agent.id,text:'Synthetic spoof',sender:'forged'}));assert.equal(fake.sender,a.agent.id);await b.agent.whenIdle();
   const ack=value(await h.tool(b.agent,'session_message_ack',{id:'host-one'}));assert.equal(ack.status,'processed');
+  await b.dispose();assert.equal((await h.rpc('release',{id:'host-one'})).status,'processed');
 });
 test('busy root finishes its tool before consuming steer; no tool abort or extra turn',async t=>{
   const h=await host();t.after(()=>h.close());const a=await h.create('synthetic-busy-a'),b=await h.create('synthetic-busy-b');
@@ -72,4 +73,15 @@ test('real held TTL expiry and strict RPC rejects permission-shaped extra fields
   await new Promise(resolve=>setTimeout(resolve,5));
   assert.equal((await h.rpc('view')).state.messages['real-ttl'].status,'expired');assert.equal(h.adapter.calls.length,0);
   assert.equal((await h.rpc('release',{id:'real-ttl'})).status,'expired');assert.equal(h.adapter.calls.length,0);
+});
+test('real model directory is opt-in and cross-workspace delivery needs bilateral consent',async t=>{
+  const h=await host();t.after(()=>h.close());const a=await h.create('synthetic-discovery-a'),b=await h.create('synthetic-discovery-b',join(h.root,'other'));
+  assert.deepEqual(value(await h.tool(a.agent,'session_message_directory',{})),[]);assert.equal((await h.rpc('view')).directory.length,2);
+  await h.rpc('policy',{id:b.agent.id,input:{mode:'accept',senders:[a.agent.id],crossWorkspace:true,alias:'private until authorized'}});
+  assert.deepEqual(value(await h.tool(a.agent,'session_message_directory',{})),[]);
+  assert.equal(value(await h.tool(a.agent,'session_message_send',{id:'one-sided',target:b.agent.id,text:'Synthetic'})).reason,'CROSS_WORKSPACE_DENIED');assert.equal(h.adapter.calls.length,0);
+  await h.rpc('policy',{id:a.agent.id,input:{mode:'refuse',senders:[],crossWorkspace:true,alias:''}});
+  const directory=value(await h.tool(a.agent,'session_message_directory',{}));assert.deepEqual(directory.map(r=>r.id),[b.agent.id]);
+  assert.deepEqual(value(await h.tool(b.agent,'session_message_directory',{})),[]);
+  assert.equal(value(await h.tool(a.agent,'session_message_send',{id:'bilateral',target:b.agent.id,text:'Synthetic'})).status,'delivered');await b.agent.whenIdle();assert.equal(h.adapter.calls.length,1);
 });

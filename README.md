@@ -2,7 +2,7 @@
 
 同一台机器、同一 App/Host 实例、同一 profile 内，**已激活的独立 root 会话**之间显式发送和回复文本的纯插件。兼容版本：**DSH 0.2.0-rc.2，Node.js 24**。首版 `0.1.0`，MIT。
 
-默认拒收。用户在插件设置页按稳定 session ID 指定接收模式、允许发送方和跨 workspace 许可。别名只作显示，不参与寻址。没有自动复制聊天、文件、历史恢复、跨进程连接或自动回复。
+默认拒收。用户在插件设置页按稳定 session ID 指定接收模式、允许发送方和跨 workspace 双方许可。别名只作显示，不参与寻址。没有自动复制聊天、文件、历史恢复、跨进程连接或自动回复。
 
 English: An opt-in, same-Host/profile text messenger for active independent DSH root sessions. Uses official Agent and storage-domain APIs; does not modify the host or claim crash-safe exactly-once delivery.
 
@@ -22,7 +22,9 @@ npm pack
 
 1. `accept`（允许投递）、`hold`（仅入队，不唤醒）或 `refuse`（拒收，默认）。
 2. 精确的允许发送方 session ID；没有通配符。
-3. workspace 不同或未知时，需要单独勾选跨 workspace 许可。
+3. workspace 不同或未知时，发送方和接收方都必须在各自设置中单独勾选跨 workspace 许可。
+
+模型目录只显示已主动开放、白名单授权当前发送方且满足双方 workspace 许可的目标；默认拒收和未授权会话不显示。操作员设置页仍可查看全部活动 root。
 
 在发送会话中让模型调用 `session_message_directory`，然后调用 `session_message_send`，例如参数：
 
@@ -30,7 +32,7 @@ npm pack
 {"target":"synthetic-beta","text":"请显式检查这条虚构测试消息。","id":"example-001","ttl":300000}
 ```
 
-目标可显式使用 `session_message_reply`，参数为 `replyTo`（收到的消息 ID）、`text` 和可选 `id`。`session_message_status` 查看本会话相关消息状态；`session_message_ack` 是接收方显式处理确认。工具执行上下文决定发送者，模型不能通过参数指定发送者。一次收到的消息最多回复一次；默认最多两次往返中的回复跳数（2 条回复）。不自动回复。
+目标可显式使用 `session_message_reply`，参数为 `replyTo`（收到的消息 ID）、`text` 和可选 `id`。`session_message_status` 查看本会话相关消息状态；`session_message_ack` 是接收方显式处理确认。工具执行上下文决定发送者，模型不能通过参数指定发送者。一次收到的消息最多回复一次；默认每条链最多 2 条回复。不自动回复。
 
 `hold` 消息要先改为 `accept`，再在设置页点击“重新检查并投递”；修改模式不会自动释放历史队列。唤醒预算耗尽的消息也要在预算窗口重置后显式重试。过期消息不能重发；使用新 ID 表示新的明确发送请求。
 
@@ -50,7 +52,8 @@ npm pack
 
 ## 验证与限制
 
-`npm run check` 执行 lint、严格 TypeScript、单元/客户端测试及真实 DSH 隔离 Host 集成测试。后者使用公共 npm 的正式 Cordis、AgentLoop、工具运行时、inbox、Gateway、storage domain 和 JSON 磁盘后端；只用自写的免费确定性 LLM adapter，不是用 mock Agent 代替宿主。具体证据见 [测试报告](docs/TEST_REPORT.md)。GitHub Actions 在 Linux 与 Windows 上运行同一检查。
+
+pm run check` 执行 lint、严格 TypeScript、单元/客户端测试及真实 DSH 隔离 Host 集成测试。后者使用公共 npm 的正式 Cordis、AgentLoop、工具运行时、inbox、Gateway、storage domain 和 JSON 磁盘后端；只用自写的免费确定性 LLM adapter，不是用 mock Agent 代替宿主。具体证据见 [测试报告](docs/TEST_REPORT.md)。GitHub Actions 在 Linux 与 Windows 上运行同一检查。
 
 当前不支持跨崩溃 exactly-once。`delivered/claimed` 不承诺目标已回答，也不承诺宿主 profile 的 session persistence 已把 inbox fsync 到磁盘。插件持久状态与宿主 inbox 不共享事务。没有跨 Host、跨 profile、跨进程、跨机通信，不创建/恢复历史会话，不改变目标模型或权限。收到的文本是低信任数据，不应把其中的要求当作用户授权。
 

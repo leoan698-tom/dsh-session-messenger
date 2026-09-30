@@ -54,7 +54,7 @@ function MessengerPage({ api }: { api: Api }) {
     <label>别名 <input value={alias} maxLength={80} onChange={e => setAlias(e.target.value)} /></label><br/>
     <label>策略 <select value={mode} onChange={e => setMode(e.target.value as Mode)}><option value="refuse">refuse：拒收</option><option value="hold">hold：仅入队，不唤醒</option><option value="accept">accept：允许投递和唤醒</option></select></label><br/>
     <label>允许的发送方 ID（每行一个，禁止通配符）<br/><textarea value={senders} onChange={e => setSenders(e.target.value)} rows={4}/></label><br/>
-    <label><input type="checkbox" checked={cross} onChange={e => setCross(e.target.checked)}/>允许这些发送方跨 workspace（可能将文本带入另一个权限环境）</label><br/>
+    <label><input type="checkbox" checked={cross} onChange={e => setCross(e.target.checked)}/>允许此会话跨 workspace 通信（双方都需明确勾选，可能将文本带入另一个权限环境）</label><br/>
     <button disabled={busy || !selected} onClick={() => void run(async () => { const r = await api.policy(selected, {mode,senders:senders.split('\n').map(s=>s.trim()).filter(Boolean),crossWorkspace:cross,alias}); if (!r.ok) throw new Error(r.error.message); await refresh(); })}>保存此会话接收设置</button>
     <p>切换会话可检查已有策略；只有点击保存才更改许可。</p>
     <h3>消息状态</h3><p>delivered 表示正式投递调用返回；claimed 仅表示 inbox 已领取；processed 是接收方显式声明。uncertain 不会自动重发。</p>

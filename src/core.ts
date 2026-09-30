@@ -50,7 +50,7 @@ export class Messenger {
   directory(caller?: Root) {
     if (caller) this.live(caller);
     const state = this.store.read();
-    return this.runtime.roots().map(r => ({ id: r.id, status: r.status, alias: this.policy(state, r).alias, mode: this.policy(state, r).mode }));
+    return this.runtime.roots().filter(r => !caller || (r !== caller && this.policy(state, r).mode !== 'refuse' && this.policy(state, r).senders.includes(caller.id) && this.workspaceAllowed(state, caller, r))).map(r => ({ id: r.id, status: r.status, alias: this.policy(state, r).alias, mode: this.policy(state, r).mode }));
   }
   inspectPolicy(id: string) { const root = this.runtime.get(id); if (!root) throw new Error('TARGET_CLOSED'); this.live(root); return structuredClone(this.policy(this.store.read(), root)); }
   /** Trusted human UI only. Never register policy mutation as a model tool. */
@@ -113,8 +113,11 @@ export class Messenger {
     const p = this.policy(state, target);
     if (p.mode === 'refuse') return 'REFUSED';
     if (!p.senders.includes(m.sender)) return 'SENDER_NOT_ALLOWED';
+    if (!this.workspaceAllowed(state, sender, target)) return 'CROSS_WORKSPACE_DENIED';
+  }
+  private workspaceAllowed(state: State, sender: Root, target: Root): boolean {
     const a = workspace(sender.session.header.cwd), b = workspace(target.session.header.cwd);
-    if ((!a || !b || a !== b) && !p.crossWorkspace) return 'CROSS_WORKSPACE_DENIED';
+    return Boolean(a && b && a === b) || (this.policy(state, sender).crossWorkspace && this.policy(state, target).crossWorkspace);
   }
   private async deliver(id: string, sender: Root, target: Root, signal?: AbortSignal) {
     let state = structuredClone(this.store.read());
@@ -158,6 +161,7 @@ export class Messenger {
     return this.serial(async () => {
       const m = this.store.read().messages[id];
       if (!m) throw new Error('MESSAGE_NOT_FOUND');
+      if (m.status !== 'queued') return this.receipt(m);
       const sender = this.runtime.get(m.sender), target = this.runtime.get(m.target);
       if (!sender || !target) {
         const state = structuredClone(this.store.read()); state.messages[id].status = 'failed'; state.messages[id].reason = 'TARGET_OR_SENDER_CLOSED'; await this.store.write(state);

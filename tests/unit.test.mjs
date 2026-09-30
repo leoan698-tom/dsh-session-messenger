@@ -51,3 +51,26 @@ test('wake budget holds new work; closed-during-durability cannot dispatch; prot
   const g=fixture();await g.policy('accept');const write=g.store.write;g.store.write=async s=>{await write(s);if(s.messages.race?.status==='dispatching')g.roots.pop();};
   assert.equal((await g.m.send(g.a,{id:'race',target:'beta',text:'synthetic'})).status,'failed');assert.equal(g.received.length,0);
 });
+test('cross-workspace requires both sender and receiver grants, default fail closed',async()=>{
+  const f=fixture();f.b.session={header:{cwd:'/synthetic/other'}};
+  await f.m.setPolicy('beta',{mode:'accept',senders:['alpha'],crossWorkspace:true,alias:''});
+  assert.equal((await f.m.send(f.a,{id:'receiver-only',target:'beta',text:'synthetic'})).reason,'CROSS_WORKSPACE_DENIED');assert.equal(f.received.length,0);
+  await f.m.setPolicy('alpha',{mode:'refuse',senders:[],crossWorkspace:true,alias:''});
+  await f.m.setPolicy('beta',{mode:'accept',senders:['alpha'],crossWorkspace:false,alias:''});
+  assert.equal((await f.m.send(f.a,{id:'sender-only',target:'beta',text:'synthetic'})).reason,'CROSS_WORKSPACE_DENIED');
+  await f.m.setPolicy('beta',{mode:'accept',senders:['alpha'],crossWorkspace:true,alias:''});assert.equal((await f.m.send(f.a,{id:'both',target:'beta',text:'synthetic'})).status,'delivered');
+});
+test('release preserves every non-queued historical receipt after sessions close',async()=>{
+  const f=fixture();await f.policy('accept');await f.m.send(f.a,{id:'history',target:'beta',text:'synthetic'});
+  f.roots.pop();
+  for(const status of ['delivered','claimed','processed','failed','expired','uncertain']){
+    const state=structuredClone(f.store.read());state.messages.history.status=status;state.messages.history.reason='PRESERVE_ORIGINAL';await f.store.write(state);
+    const before=structuredClone(f.store.read());assert.equal((await f.m.release('history')).status,status);assert.deepEqual(f.store.read(),before);
+  }
+});
+test('model discovery hides default-refuse, unauthorized and cross-workspace-denied roots',async()=>{
+  const f=fixture();assert.deepEqual(f.m.directory(f.a),[]);assert.equal(f.m.directory().length,2);
+  await f.policy('hold');assert.equal(f.m.directory(f.a)[0].id,'beta');
+  await f.m.setPolicy('beta',{mode:'accept',senders:[],crossWorkspace:false,alias:'private alias'});assert.deepEqual(f.m.directory(f.a),[]);
+  f.b.session={header:{cwd:'/synthetic/other'}};await f.m.setPolicy('beta',{mode:'accept',senders:['alpha'],crossWorkspace:true,alias:'private alias'});assert.deepEqual(f.m.directory(f.a),[]);
+});
